@@ -1,6 +1,11 @@
 import 'dart:math';
 
+import 'package:assets_audio_player/assets_audio_player.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:palette_generator/palette_generator.dart';
+import 'package:shop_app/components/social_button_bar.dart';
+import 'package:shop_app/components/star_rating.dart';
 import 'package:shop_app/constants.dart';
 import 'package:http/http.dart' as http;
 import 'package:shop_app/models/bb_model.dart';
@@ -23,6 +28,8 @@ class _FeaturedRecordsState extends State<FeaturedRecords> {
   void initState() {
     super.initState();
 
+    records.add(getRecord());
+    records.add(getRecord());
     records.add(getRecord());
     records.add(getRecord());
     records.add(getRecord());
@@ -143,13 +150,22 @@ class RecordWidget extends StatelessWidget {
               return FeaturedRecordCard(
                 imagePath: snapshot.data.images.url,
                 press: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) {
-                    return PhotoView(
-                      url: snapshot.data.images.url,
-                      name: snapshot.data.artists.name,
-                      albumName: snapshot.data.albumName,
-                    );
-                  }));
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) {
+                        return PhotoView(
+                          url: snapshot.data.images.url,
+                          name: snapshot.data.artists.name,
+                          albumName: snapshot.data.albumName,
+                          previewUrl: snapshot.data.sample,
+                          releaseDate: snapshot.data.releaseDate,
+                          popularity: (snapshot.data.popularity / 20).round(),
+                          trackList: snapshot.data.trackList,
+                        );
+                      },
+                    ),
+                  );
                 },
               );
             } else {
@@ -164,69 +180,241 @@ class RecordWidget extends StatelessWidget {
   }
 }
 
-class PhotoView extends StatelessWidget {
-  const PhotoView({
-    Key key,
-    this.url,
-    this.name,
-    this.albumName,
-  }) : super(key: key);
+class _PhotoViewState extends State<PhotoView> {
+  AssetsAudioPlayer _assetsAudioPlayer;
+  List<PaletteColor> colorPalette;
+  var isPreviewNull = true;
+  var _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  final String url;
-  final String name;
-  final String albumName;
+  @override
+  void initState() {
+    super.initState();
+    colorPalette = [];
+    updatePalette();
+    _assetsAudioPlayer = AssetsAudioPlayer();
+
+    if (widget.previewUrl != null) {
+      _assetsAudioPlayer.open(
+        Audio.network(widget.previewUrl),
+        autoStart: false,
+      );
+      isPreviewNull = false;
+    }
+  }
+
+  updatePalette() async {
+    final PaletteGenerator generator =
+        await PaletteGenerator.fromImageProvider(NetworkImage(widget.url));
+    colorPalette.add(generator.dominantColor != null
+        ? generator.dominantColor
+        : generator.vibrantColor);
+    setState(() {});
+  }
+
+  bool isNull() {
+    if (widget.previewUrl == null) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _assetsAudioPlayer.stop();
+    _assetsAudioPlayer = null;
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     Size size = MediaQuery.of(context).size;
     return Scaffold(
       backgroundColor: kBackgroundColor,
-      body: GestureDetector(
+      key: _scaffoldKey,
+      body: SingleChildScrollView(
         child: Container(
-          child: Center(
-            child: Hero(
-              tag: '$albumName cover',
-              child: Image.network(
-                url,
+          decoration: BoxDecoration(
+            color: kBackgroundColor,
+            shape: BoxShape.rectangle,
+          ),
+          child: Column(
+            children: [
+              GestureDetector(
+                child: Container(
+                  height: size.width + 35,
+                  child: Stack(children: <Widget>[
+                    Container(
+                      margin: EdgeInsets.only(
+                        bottom: 20,
+                        left: 10,
+                        right: 10,
+                      ),
+                      height: size.width,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.only(
+                          bottomLeft: Radius.circular(63),
+                          bottomRight: Radius.circular(63),
+                        ),
+                        image: DecorationImage(
+                          alignment: Alignment.center,
+                          fit: BoxFit.cover,
+                          image: NetworkImage(widget.url),
+                        ),
+                      ),
+                    ),
+                    !isNull()
+                        ? Container(
+                            child: Align(
+                              alignment: Alignment.bottomCenter,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                    color: kBackgroundColor,
+                                    borderRadius: BorderRadius.circular(100)),
+                                child: GestureDetector(
+                                  child: _assetsAudioPlayer.builderIsPlaying(
+                                      builder: (context, isPlaying) {
+                                    return Icon(
+                                        isPlaying
+                                            ? Icons.pause_circle_filled
+                                            : Icons.play_circle_filled,
+                                        size: 65,
+                                        color: colorPalette.isNotEmpty &&
+                                                colorPalette[0]
+                                                        .color
+                                                        .computeLuminance() <
+                                                    0.75
+                                            ? colorPalette[0].color
+                                            : Colors.black);
+                                  }),
+                                  onTap: () {
+                                    _assetsAudioPlayer.playOrPause();
+                                  },
+                                ),
+                              ),
+                            ),
+                          )
+                        : Container()
+                  ]),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                },
               ),
-            ),
+              Container(
+                width: size.width,
+                margin: EdgeInsets.only(
+                  left: 30,
+                  right: 30,
+                  top: 20,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.albumName,
+                      style: GoogleFonts.nobile(
+                        fontSize: 40,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Container(
+                      margin: EdgeInsets.only(bottom: 10, top: 5),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: size.width / 2,
+                            child: Text(
+                              widget.name,
+                              style: GoogleFonts.nobile(
+                                fontSize: 25,
+                                fontWeight: FontWeight.w400,
+                                color: Colors.black38,
+                              ),
+                            ),
+                          ),
+                          Spacer(),
+                          Text(
+                            "(" + widget.releaseDate.substring(0, 4) + ")",
+                            style: GoogleFonts.nobile(
+                              fontSize: 25,
+                              fontWeight: FontWeight.w400,
+                              color: Colors.black38,
+                            ),
+                          )
+                        ],
+                      ),
+                    ),
+                    StarDisplay(
+                      value: widget.popularity,
+                      size: 18,
+                    )
+                  ],
+                ),
+              ),
+              SocialButtonBar(
+                colorPalette: colorPalette,
+                scaffoldKey: _scaffoldKey,
+              ),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Container(
+                  alignment: Alignment.centerLeft,
+                  height: 50,
+                  width: size.width,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(30),
+                    color: Colors.red.shade200,
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        widget.trackList[2].name,
+                      ),
+                      Spacer(),
+                      Text(milisecondsToTimeStamp(
+                          widget.trackList[2].durationMs))
+                    ],
+                  ),
+                ),
+              )
+            ],
           ),
         ),
-        onTap: () {
-          Navigator.pop(context);
-        },
-      ),
-      bottomSheet: Row(
-        children: [
-          Spacer(),
-          Container(
-            margin: EdgeInsets.only(bottom: 50),
-            height: size.height / 9,
-            width: size.width / 1.25,
-            alignment: Alignment.center,
-            child: Row(
-              children: [
-                GestureDetector(
-                  child: Image.network(
-                    'https://www.nmvinc.com/proofs/mckesson/skin/img/play_black@x2.png',
-                    scale: 7,
-                  ),
-                  onTap: () {},
-                ),
-                Expanded(
-                  child: Text(
-                    '$name - $albumName',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 28),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Spacer()
-        ],
       ),
     );
   }
+}
+
+String milisecondsToTimeStamp(int duration) {
+  var minutes = (duration / 60000).floor();
+  var seconds = ((duration % 60000) / 1000).toStringAsFixed(0);
+
+  return '$minutes:$seconds';
+}
+
+class PhotoView extends StatefulWidget {
+  final String url;
+  final String name;
+  final String albumName;
+  final String previewUrl;
+  final String releaseDate;
+  final int popularity;
+  final List<Track> trackList;
+
+  const PhotoView({
+    Key key,
+    this.url,
+    this.name,
+    this.albumName,
+    this.previewUrl,
+    this.releaseDate,
+    this.popularity,
+    this.trackList,
+  }) : super(key: key);
+
+  @override
+  _PhotoViewState createState() => _PhotoViewState();
 }
 
 class FeaturedRecordCard extends StatelessWidget {
