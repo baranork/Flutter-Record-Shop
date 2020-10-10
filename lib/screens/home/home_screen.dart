@@ -47,7 +47,7 @@ class HomeScreen extends StatelessWidget {
             ),
             ListTile(
               leading: Icon(Icons.apps),
-              title: Text("All plats"),
+              title: Text("All Records"),
             ),
             ListTile(
               leading: Icon(Icons.favorite),

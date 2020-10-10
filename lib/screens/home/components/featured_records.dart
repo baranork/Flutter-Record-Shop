@@ -377,6 +377,28 @@ class _PhotoViewState extends State<PhotoView> {
                     ],
                   ),
                 ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Container(
+                  alignment: Alignment.centerLeft,
+                  height: 50,
+                  width: size.width,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(30),
+                    //color: Colors.red.shade200,
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        widget.trackList[3].name,
+                      ),
+                      Spacer(),
+                      Text(milisecondsToTimeStamp(
+                          widget.trackList[3].durationMs))
+                    ],
+                  ),
+                ),
               )
             ],
           ),
